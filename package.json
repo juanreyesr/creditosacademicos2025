@@ -1,11 +1,22 @@
 {
-  "$schema": "https://railway.app/railway.schema.json",
-  "build": {
-    "builder": "NIXPACKS"
+  "name": "sistema-creditos-academicos",
+  "version": "1.0.0",
+  "description": "Sistema de Créditos Académicos",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
   },
-  "deploy": {
-    "numReplicas": 1,
-    "sleepApplication": false,
-    "restartPolicyType": "ON_FAILURE"
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.6.5",
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "bcrypt": "^5.1.1",
+    "jsonwebtoken": "^9.0.2"
+  },
+  "engines": {
+    "node": "18.x"
   }
 }
