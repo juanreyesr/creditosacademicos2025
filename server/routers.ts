@@ -6,6 +6,7 @@ import { publicProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
+import { supabaseServer } from "./supabaseClient";
 import { 
   hashPassword, 
   verifyPassword, 
@@ -15,16 +16,10 @@ import {
   sendNewCourseNotification,
   sendWebinarReminder,
   sendDiplomaNotification,
-} from "./auth";
-import { 
-  parseExcelFile, 
-  convertToAgremiadosData, 
-  generateExcelTemplate 
-} from "./excel";
-import { 
-  generateDiplomaData, 
-  generateDiplomaHTML 
-} from "./diploma";
+} from "./_core/mail";
+import { generateDiplomaData, generateDiplomaHTML } from "./_core/diploma";
+import { parseExcelFile } from "./_core/excel";
+import { nanoid } from "nanoid";
 
 // Custom procedure for agremiados authentication
 const agremiadoProcedure = publicProcedure.use(async ({ ctx, next }) => {
@@ -103,7 +98,7 @@ export const appRouter = router({
         }
 
         const isValid = await verifyPassword(input.password, agremiado.passwordHash);
-        
+
         if (!isValid) {
           throw new TRPCError({ 
             code: "UNAUTHORIZED", 
@@ -140,319 +135,160 @@ export const appRouter = router({
 
     requestPasswordReset: publicProcedure
       .input(z.object({
-        email: z.string().email(),
+        numeroColegiado: z.string(),
       }))
       .mutation(async ({ input }) => {
-        const agremiado = await db.getAgremiadoByEmail(input.email);
-        
-        if (!agremiado) {
-          // Don't reveal if email exists
-          return { success: true };
+        const agremiado = await db.getAgremiadoByNumeroColegiado(input.numeroColegiado);
+
+        if (!agremiado || !agremiado.email) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "No se encontró un agremiado con ese número de colegiado",
+          });
         }
 
-        const resetToken = Math.random().toString(36).substring(2, 15);
-        
-        // In a real app, store reset token in database with expiration
-        // For now, we'll just send the email
-        await sendPasswordResetEmail(
-          agremiado.email,
-          agremiado.nombreCompleto,
-          resetToken
-        );
+        const token = nanoid(32);
+        const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hora
+
+        await db.createPasswordResetToken({
+          agremiadoId: agremiado.id,
+          token,
+          expiresAt,
+        });
+
+        await sendPasswordResetEmail(agremiado.email, agremiado.nombreCompleto, token);
 
         return { success: true };
       }),
 
-    changePassword: agremiadoProcedure
+    resetPassword: publicProcedure
       .input(z.object({
-        currentPassword: z.string().optional(),
-        newPassword: z.string().min(8),
+        token: z.string(),
+        password: z.string().min(8),
       }))
-      .mutation(async ({ input, ctx }) => {
-        // If not first login, verify current password
-        if (!ctx.agremiado.primerIngreso && input.currentPassword) {
-          if (!ctx.agremiado.passwordHash) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: "No hay contraseña actual" });
-          }
+      .mutation(async ({ input }) => {
+        const resetToken = await db.getPasswordResetToken(input.token);
 
-          const isValid = await verifyPassword(input.currentPassword, ctx.agremiado.passwordHash);
-          
-          if (!isValid) {
-            throw new TRPCError({ code: "UNAUTHORIZED", message: "Contraseña actual incorrecta" });
-          }
+        if (!resetToken || resetToken.usedAt || resetToken.expiresAt < new Date()) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Enlace inválido o expirado",
+          });
         }
 
-        const newPasswordHash = await hashPassword(input.newPassword);
-        
-        await db.updateAgremiado(ctx.agremiado.id, {
-          passwordHash: newPasswordHash,
+        const agremiado = await db.getAgremiadoById(resetToken.agremiadoId);
+
+        if (!agremiado) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Agremiado no encontrado",
+          });
+        }
+
+        const passwordHash = await hashPassword(input.password);
+
+        await db.updateAgremiado(agremiado.id, {
+          passwordHash,
           primerIngreso: false,
         });
 
+        await db.markPasswordResetTokenAsUsed(resetToken.id);
+
         return { success: true };
       }),
   }),
 
-  // Categorias
-  categorias: router({
-    getAll: publicProcedure.query(async () => {
-      return await db.getAllCategorias();
-    }),
-
-    getById: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getCategoriaById(input.id);
-      }),
+  agremiados: router({
+    me: agremiadoProcedure.query(({ ctx }) => ctx.agremiado),
   }),
 
-  // Cursos
   cursos: router({
-    getAll: publicProcedure.query(async () => {
-      return await db.getAllCursos();
+    listPublic: publicProcedure.query(async () => {
+      return await db.getPublicCursos();
     }),
 
-    getByCategoria: publicProcedure
-      .input(z.object({ categoriaId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getCursosByCategoria(input.categoriaId);
-      }),
+    listMyCursos: agremiadoProcedure.query(async ({ ctx }) => {
+      return await db.getCursosByAgremiado(ctx.agremiado.id);
+    }),
 
-    getById: publicProcedure
-      .input(z.object({ id: z.number() }))
+    getBySlug: publicProcedure
+      .input(z.object({ slug: z.string() }))
       .query(async ({ input }) => {
-        const curso = await db.getCursoById(input.id);
+        const curso = await db.getCursoBySlug(input.slug);
         if (!curso) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Curso no encontrado" });
         }
         return curso;
       }),
 
-    search: publicProcedure
-      .input(z.object({ query: z.string() }))
-      .query(async ({ input }) => {
-        return await db.searchCursos(input.query);
-      }),
-
-    getWithProgress: agremiadoProcedure
+    register: agremiadoProcedure
       .input(z.object({ cursoId: z.number() }))
-      .query(async ({ input, ctx }) => {
+      .mutation(async ({ input, ctx }) => {
         const curso = await db.getCursoById(input.cursoId);
         if (!curso) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Curso no encontrado" });
         }
 
-        const progreso = await db.getProgresoCurso(ctx.agremiado.id, input.cursoId);
-        const videos = await db.getVideosByCurso(input.cursoId);
-
-        return {
-          curso,
-          progreso,
-          videos,
-        };
-      }),
-    
-    create: adminProcedure
-      .input(z.object({
-        titulo: z.string(),
-        descripcion: z.string(),
-        categoriaId: z.number(),
-        duracionMinutos: z.number().optional(),
-        nivel: z.enum(["basico", "intermedio", "avanzado"]),
-        orden: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const curso = await db.createCurso(input);
-        return curso;
-      }),
-    
-    update: adminProcedure
-      .input(z.object({
-        id: z.number(),
-        titulo: z.string().optional(),
-        descripcion: z.string().optional(),
-        categoriaId: z.number().optional(),
-        duracionMinutos: z.number().optional(),
-        nivel: z.enum(["basico", "intermedio", "avanzado"]).optional(),
-        orden: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        await db.updateCurso(id, data);
-        return { success: true };
-      }),
-    
-    delete: adminProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.deleteCurso(input.id);
-        return { success: true };
-      }),
-    
-    toggleActivo: adminProcedure
-      .input(z.object({ id: z.number(), activo: z.boolean() }))
-      .mutation(async ({ input }) => {
-        await db.updateCurso(input.id, { activo: input.activo });
-        return { success: true };
-      }),
-  }),
-
-  // Videos
-  videos: router({
-    getByCurso: publicProcedure
-      .input(z.object({ cursoId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getVideosByCurso(input.cursoId);
-      }),
-
-    getById: publicProcedure
-      .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getVideoById(input.id);
-      }),
-    
-    create: adminProcedure
-      .input(z.object({
-        cursoId: z.number(),
-        titulo: z.string(),
-        descripcion: z.string().optional(),
-        youtubeUrl: z.string(),
-        duracionMinutos: z.number().optional(),
-        orden: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const video = await db.createVideo(input);
-        return video;
-      }),
-    
-    update: adminProcedure
-      .input(z.object({
-        id: z.number(),
-        titulo: z.string().optional(),
-        descripcion: z.string().optional(),
-        youtubeUrl: z.string().optional(),
-        duracionMinutos: z.number().optional(),
-        orden: z.number().optional(),
-      }))
-      .mutation(async ({ input }) => {
-        const { id, ...data } = input;
-        await db.updateVideo(id, data);
-        return { success: true };
-      }),
-    
-    delete: adminProcedure
-      .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.deleteVideo(input.id);
-        return { success: true };
-      }),
-    
-    toggleActivo: adminProcedure
-      .input(z.object({ id: z.number(), activo: z.boolean() }))
-      .mutation(async ({ input }) => {
-        await db.updateVideo(input.id, { activo: input.activo });
-        return { success: true };
-      }),
-    
-    reorder: adminProcedure
-      .input(z.object({ videoId: z.number(), newOrden: z.number() }))
-      .mutation(async ({ input }) => {
-        await db.updateVideo(input.videoId, { orden: input.newOrden });
-        return { success: true };
-      }),
-  }),
-
-  // Progreso
-  progreso: router({
-    getMyCursos: agremiadoProcedure.query(async ({ ctx }) => {
-      return await db.getProgresosByAgremiado(ctx.agremiado.id);
-    }),
-
-    updateProgreso: agremiadoProcedure
-      .input(z.object({
-        cursoId: z.number(),
-        videoId: z.number().optional(),
-        porcentajeCompletado: z.number().min(0).max(100),
-        completado: z.boolean(),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        await db.upsertProgresoCurso({
-          agremiadoId: ctx.agremiado.id,
-          cursoId: input.cursoId,
-          videoId: input.videoId,
-          porcentajeCompletado: input.porcentajeCompletado,
-          completado: input.completado,
-        });
-
-        return { success: true };
-      }),
-  }),
-
-  // Evaluaciones
-  evaluaciones: router({
-    getByCurso: agremiadoProcedure
-      .input(z.object({ cursoId: z.number() }))
-      .query(async ({ input, ctx }) => {
-        const evaluacion = await db.getEvaluacionByCurso(input.cursoId);
-        
-        if (!evaluacion) {
-          return null;
+        const existing = await db.getCursoInscripcion(ctx.agremiado.id, curso.id);
+        if (existing) {
+          return { success: true, alreadyRegistered: true as const };
         }
 
-        const intentos = await db.getIntentosEvaluacion(ctx.agremiado.id, evaluacion.id);
-        
-        return {
-          evaluacion,
-          intentos,
-          intentosRestantes: Math.max(0, evaluacion.intentosMaximos - intentos.length),
-        };
-      }),
+        await db.createCursoInscripcion({
+          agremiadoId: ctx.agremiado.id,
+          cursoId: curso.id,
+        });
 
-    getPreguntas: agremiadoProcedure
-      .input(z.object({ evaluacionId: z.number() }))
-      .query(async ({ input }) => {
-        const preguntas = await db.getPreguntasByEvaluacion(input.evaluacionId);
-        
-        // Shuffle and select 10 random questions
-        const shuffled = preguntas.sort(() => Math.random() - 0.5);
-        const selected = shuffled.slice(0, 10);
-        
-        // Return without correct answers
-        return selected.map(p => ({
-          id: p.id,
-          textoPregunta: p.textoPregunta,
-          opcionA: p.opcionA,
-          opcionB: p.opcionB,
-          opcionC: p.opcionC,
-          opcionD: p.opcionD,
-        }));
-      }),
+        await sendNewCourseNotification(
+          ctx.agremiado.email,
+          ctx.agremiado.nombreCompleto,
+          curso.titulo
+        );
 
-    submitRespuestas: agremiadoProcedure
-      .input(z.object({
-        evaluacionId: z.number(),
-        respuestas: z.array(z.object({
-          preguntaId: z.number(),
-          respuesta: z.enum(["A", "B", "C", "D"]),
-        })),
-      }))
-      .mutation(async ({ input, ctx }) => {
-        const evaluacion = await db.getEvaluacionByCurso(input.evaluacionId);
-        
+        return { success: true, alreadyRegistered: false as const };
+      }),
+  }),
+
+  evaluaciones: router({
+    getByCursoId: agremiadoProcedure
+      .input(z.object({ cursoId: z.number() }))
+      .query(async ({ input, ctx }) => {
+        const evaluacion = await db.getEvaluacionByCursoId(input.cursoId);
+
         if (!evaluacion) {
           throw new TRPCError({ code: "NOT_FOUND", message: "Evaluación no encontrada" });
         }
 
-        const intentos = await db.getIntentosEvaluacion(ctx.agremiado.id, input.evaluacionId);
+        const inscripcion = await db.getCursoInscripcion(ctx.agremiado.id, input.cursoId);
         
-        if (intentos.length >= evaluacion.intentosMaximos) {
+        if (!inscripcion) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Debe estar inscrito en el curso" });
+        }
+
+        return evaluacion;
+      }),
+
+    startAttempt: agremiadoProcedure
+      .input(z.object({ evaluacionId: z.number() }))
+      .mutation(async ({ input, ctx }) => {
+        const evaluacion = await db.getEvaluacionById(input.evaluacionId);
+
+        if (!evaluacion) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Evaluación no encontrada" });
+        }
+
+        const intentos = await db.getIntentosByEvaluacionAndAgremiado(
+          input.evaluacionId,
+          ctx.agremiado.id
+        );
+
+        if (intentos.length >= evaluacion.maxIntentos) {
           throw new TRPCError({ 
-            code: "BAD_REQUEST", 
-            message: "Ha alcanzado el número máximo de intentos" 
+            code: "FORBIDDEN", 
+            message: "Has alcanzado el número máximo de intentos permitidos" 
           });
         }
 
-        // Check if needs to wait
         if (intentos.length > 0) {
           const lastIntento = intentos[0];
           const horasDesdeUltimoIntento = 
@@ -461,37 +297,78 @@ export const appRouter = router({
           if (horasDesdeUltimoIntento < evaluacion.tiempoEsperaHoras) {
             const horasRestantes = Math.ceil(evaluacion.tiempoEsperaHoras - horasDesdeUltimoIntento);
             throw new TRPCError({ 
-              code: "BAD_REQUEST", 
+              code: "FORBIDDEN", 
               message: `Debe esperar ${horasRestantes} horas antes del siguiente intento` 
             });
           }
         }
 
-        // Get all questions and check answers
-        const preguntas = await db.getPreguntasByEvaluacion(input.evaluacionId);
-        const preguntasMap = new Map(preguntas.map(p => [p.id, p]));
-        
-        let correctas = 0;
-        const respuestasDetalle = input.respuestas.map(r => {
-          const pregunta = preguntasMap.get(r.preguntaId);
-          const esCorrecta = pregunta?.respuestaCorrecta === r.respuesta;
-          if (esCorrecta) correctas++;
-          
-          return {
-            preguntaId: r.preguntaId,
-            respuesta: r.respuesta,
-            correcta: esCorrecta,
-          };
+        const intento = await db.createIntento({
+          evaluacionId: input.evaluacionId,
+          agremiadoId: ctx.agremiado.id,
+          fechaIntento: new Date(),
         });
 
-        const puntajeObtenido = Math.round((correctas / input.respuestas.length) * 100);
-        const aprobado = puntajeObtenido >= evaluacion.puntajeMinimo;
+        return intento;
+      }),
 
-        // Save attempt
-        await db.createIntentoEvaluacion({
-          agremiadoId: ctx.agremiado.id,
-          evaluacionId: input.evaluacionId,
-          numeroIntento: intentos.length + 1,
+    evaluar: agremiadoProcedure
+      .input(z.object({
+        intentoId: z.number(),
+        respuestas: z.array(z.object({
+          preguntaId: z.number(),
+          opcionSeleccionadaId: z.number().nullable(),
+        })),
+      }))
+      .mutation(async ({ input, ctx }) => {
+        const intento = await db.getIntentoById(input.intentoId);
+
+        if (!intento || intento.agremiadoId !== ctx.agremiado.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Intento no válido" });
+        }
+
+        const evaluacion = await db.getEvaluacionById(intento.evaluacionId);
+
+        if (!evaluacion) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Evaluación no encontrada" });
+        }
+
+        const preguntas = await db.getPreguntasByEvaluacionId(evaluacion.id);
+        const opciones = await db.getOpcionesByEvaluacionId(evaluacion.id);
+
+        if (preguntas.length === 0) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "La evaluación no tiene preguntas" });
+        }
+
+        let puntajeObtenido = 0;
+        const respuestasDetalle = [];
+
+        for (const respuesta of input.respuestas) {
+          const pregunta = preguntas.find(p => p.id === respuesta.preguntaId);
+          
+          if (!pregunta) continue;
+
+          const opcionesPregunta = opciones.filter(o => o.preguntaId === pregunta.id);
+          const opcionCorrecta = opcionesPregunta.find(o => o.esCorrecta);
+
+          const esCorrecta = 
+            opcionCorrecta && respuesta.opcionSeleccionadaId === opcionCorrecta.id;
+
+          if (esCorrecta) {
+            puntajeObtenido += pregunta.puntaje;
+          }
+
+          respuestasDetalle.push({
+            preguntaId: pregunta.id,
+            opcionSeleccionadaId: respuesta.opcionSeleccionadaId,
+            esCorrecta,
+          });
+        }
+
+        const aprobado = puntajeObtenido >= evaluacion.puntajeMinimo;
+        const correctas = respuestasDetalle.filter(r => r.esCorrecta).length;
+
+        await db.updateIntento(intento.id, {
           puntajeObtenido,
           aprobado,
           respuestas: JSON.stringify(respuestasDetalle),
@@ -500,7 +377,7 @@ export const appRouter = router({
         // If approved, generate diploma
         if (aprobado) {
           const curso = await db.getCursoById(evaluacion.cursoId);
-          
+
           if (curso) {
             const diplomaData = await generateDiplomaData({
               nombreCompleto: ctx.agremiado.nombreCompleto,
@@ -516,6 +393,36 @@ export const appRouter = router({
               codigoVerificacion: diplomaData.codigoVerificacion,
               codigoQR: diplomaData.codigoQR,
             });
+
+            // Registrar crédito en Supabase (tabla registros)
+            try {
+              await supabaseServer.from("registros").insert({
+                // Ajusta estos campos si tu tabla cambia
+                usuario_id: process.env.REGISTROS_USUARIO_ID ?? null,
+                correlativo: null,
+                nombre: ctx.agremiado.nombreCompleto,
+                telefono: null,
+                colegiado_numero: ctx.agremiado.numeroColegiado,
+                colegiado_activo: ctx.agremiado.activo,
+                actividad: curso.titulo,
+                institucion: "Colegio de Psicólogos de Guatemala",
+                tipo: "Aula Virtual",
+                fecha: new Date().toISOString(),
+                horas: 1,
+                creditos: 1,
+                observaciones:
+                  "Registro generado automáticamente desde el Aula Virtual",
+                archivo_url: null,
+                archivo_mime: "application/pdf",
+                hash: diplomaData.codigoVerificacion,
+                exportado: false,
+              });
+            } catch (error) {
+              console.error(
+                "Error al registrar crédito en Supabase (registros):",
+                error
+              );
+            }
 
             // Send notification
             await sendDiplomaNotification(
@@ -585,24 +492,12 @@ export const appRouter = router({
           nombreCompleto: ctx.agremiado.nombreCompleto,
           cursoTitulo: curso.titulo,
           tipo: diploma.tipo,
-          fechaEmision: diploma.fechaEmision,
+          fechaEmision: diploma.createdAt,
           codigoVerificacion: diploma.codigoVerificacion,
-          codigoQR: diploma.codigoQR || "",
         });
 
         return { html };
       }),
-  }),
-
-  // Webinars
-  webinars: router({
-    getProximos: publicProcedure.query(async () => {
-      return await db.getWebinarsProximos();
-    }),
-
-    getFinalizados: publicProcedure.query(async () => {
-      return await db.getWebinarsFinalizados();
-    }),
   }),
 
   // Admin routes
@@ -621,67 +516,11 @@ export const appRouter = router({
             success: false,
             errors: result.errors,
             duplicates: result.duplicates,
-            validCount: result.valid.length,
           };
         }
 
-        const agremiadosData = await convertToAgremiadosData(result.valid, true);
-        
-        // Check for existing agremiados in database
-        const existing = [];
-        for (const data of agremiadosData) {
-          const existingAgremiado = await db.getAgremiadoByNumeroColegiado(data.numeroColegiado!);
-          if (existingAgremiado) {
-            existing.push(data.numeroColegiado);
-          }
-        }
+        await db.bulkInsertAgremiados(result.agremiados);
 
-        if (existing.length > 0) {
-          return {
-            success: false,
-            errors: [],
-            duplicates: existing.map(nc => `Número de colegiado ya existe en la base de datos: ${nc}`),
-            validCount: result.valid.length - existing.length,
-          };
-        }
-
-        await db.bulkInsertAgremiados(agremiadosData);
-
-        return {
-          success: true,
-          imported: agremiadosData.length,
-        };
-      }),
-
-    downloadTemplate: adminProcedure.query(() => {
-      const buffer = generateExcelTemplate();
-      return {
-        base64: buffer.toString("base64"),
-        filename: "plantilla_agremiados.xlsx",
-      };
-    }),
-
-    getEstadisticas: adminProcedure.query(async () => {
-      const stats = await db.getEstadisticasGenerales();
-      const cursosPopulares = await db.getCursosPopulares(5);
-      
-      return {
-        ...stats,
-        cursosPopulares,
-      };
-    }),
-
-    getAllAgremiados: adminProcedure.query(async () => {
-      return await db.getAllAgremiados();
-    }),
-    
-    toggleAgremiadoActivo: adminProcedure
-      .input(z.object({
-        id: z.number(),
-        activo: z.boolean(),
-      }))
-      .mutation(async ({ input }) => {
-        await db.updateAgremiado(input.id, { activo: input.activo });
         return { success: true };
       }),
   }),
