@@ -1,3 +1,4 @@
+// server/supabaseClient.ts
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = process.env.SUPABASE_URL;
@@ -9,9 +10,12 @@ if (!supabaseUrl || !serviceRoleKey) {
   );
 }
 
-// Cliente para usar SOLO en el backend (usa la service role key)
+/**
+ * Cliente de Supabase para uso EXCLUSIVO en el backend.
+ * Usa la service role key, por lo que NUNCA debe exponerse al frontend.
+ */
 export const supabaseServer = createClient(supabaseUrl, serviceRoleKey, {
   auth: {
-    persistSession: false
-  }
+    persistSession: false,
+  },
 });
