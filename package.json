@@ -15,7 +15,7 @@
   "db:create-admin": "tsx create-admin.ts"
 },
   "dependencies": {
-    "@supabase/supabase-js": "^2.48.0"
+    "@supabase/supabase-js": "^2.48.0",
     "@aws-sdk/client-s3": "^3.693.0",
     "@aws-sdk/s3-request-presigner": "^3.693.0",
     "@radix-ui/react-accordion": "^1.2.12",
