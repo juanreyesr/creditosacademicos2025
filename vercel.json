@@ -1,6 +1,0 @@
-{
-  "version": 2,
-  "buildCommand": "pnpm build",
-  "outputDirectory": "dist/public",
-  "installCommand": "pnpm install"
-}
