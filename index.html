@@ -1,12 +1,876 @@
-<!doctype html>
-<html lang="es">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Aula Virtual</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+import React, { useState, useEffect, useRef } from 'react';
+import { Play, Info, CheckCircle, XCircle, LogOut, Plus, Trash2, Award, ChevronLeft, Lock, Save, ExternalLink, Menu, X } from 'lucide-react';
+
+// --- CONFIGURACIÓN Y DATOS INICIALES ---
+
+const ADMIN_CREDENTIALS = {
+  email: "juanr502@yahoo.es",
+  password: "Tatyalejandro5826"
+};
+
+const INITIAL_VIDEOS = [
+  {
+    id: 1,
+    title: "Introducción a la Psicología Clínica",
+    category: "Psicología Clínica",
+    youtubeId: "hJKwF2rXGz4", // ID de ejemplo
+    duration: "2",
+    description: "Un recorrido fundamental por los principios de la práctica clínica moderna y el abordaje del paciente.",
+    thumbnail: "https://img.youtube.com/vi/hJKwF2rXGz4/maxresdefault.jpg",
+    quizEnabled: true,
+    questions: Array(10).fill(null).map((_, i) => ({
+      question: `¿Pregunta de prueba ${i + 1} sobre Psicología Clínica?`,
+      options: ["Opción A (Correcta)", "Opción B", "Opción C"],
+      correctAnswer: 0
+    }))
+  },
+  {
+    id: 2,
+    title: "Ética Profesional en la Salud Mental",
+    category: "Ética y Legislación",
+    youtubeId: "PrJj3sP7b-M", 
+    duration: "1.5",
+    description: "Análisis del código deontológico y dilemas éticos frecuentes en la consulta.",
+    thumbnail: "https://img.youtube.com/vi/PrJj3sP7b-M/maxresdefault.jpg",
+    quizEnabled: false,
+    questions: []
+  },
+  {
+    id: 3,
+    title: "Neuropsicología del Aprendizaje",
+    category: "Neuropsicología",
+    youtubeId: "MMP3e9yZqIw",
+    duration: "3",
+    description: "Exploración de las bases neurológicas que sustentan los procesos de aprendizaje y memoria.",
+    thumbnail: "https://img.youtube.com/vi/MMP3e9yZqIw/maxresdefault.jpg",
+    quizEnabled: true,
+    questions: Array(10).fill(null).map((_, i) => ({
+      question: `¿Pregunta conceptual ${i + 1}?`,
+      options: ["Respuesta Incorrecta", "Respuesta Correcta", "Otra Incorrecta"],
+      correctAnswer: 1
+    }))
+  }
+];
+
+// --- COMPONENTES PRINCIPALES ---
+
+export default function App() {
+  // Estado Global
+  const [view, setView] = useState('home'); // home, player, admin, login
+  const [videos, setVideos] = useState([]);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  
+  // Estado de Usuario (para certificados)
+  const [userProfile, setUserProfile] = useState({ name: '', collegiateNumber: '' });
+
+  // Cargar datos (simulación de persistencia)
+  useEffect(() => {
+    const savedVideos = localStorage.getItem('cpg_videos');
+    if (savedVideos) {
+      setVideos(JSON.parse(savedVideos));
+    } else {
+      setVideos(INITIAL_VIDEOS);
+    }
+  }, []);
+
+  // Guardar datos cuando cambian
+  useEffect(() => {
+    if (videos.length > 0) {
+      localStorage.setItem('cpg_videos', JSON.stringify(videos));
+    }
+  }, [videos]);
+
+  // --- NAVEGACIÓN Y VISTAS ---
+
+  const handleLogin = (email, password) => {
+    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
+      setIsAdmin(true);
+      setView('admin');
+    } else {
+      alert("Credenciales incorrectas");
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAdmin(false);
+    setView('home');
+  };
+
+  const categories = [...new Set(videos.map(v => v.category))];
+  const recentVideos = [...videos].reverse().slice(0, 5);
+
+  return (
+    <div className="min-h-screen bg-[#141414] text-white font-sans selection:bg-blue-600 selection:text-white overflow-x-hidden">
+      {/* Navbar */}
+      <nav className="fixed top-0 w-full z-50 bg-gradient-to-b from-black/90 to-transparent px-4 py-4 flex justify-between items-center transition-all duration-300">
+        <div className="flex items-center gap-4 cursor-pointer" onClick={() => setView('home')}>
+          {/* Logo Actualizado */}
+          <img 
+            src="Logo-cpg grande.png" 
+            alt="Logo CPG" 
+            className="w-12 h-12 object-contain filter drop-shadow-lg"
+            onError={(e) => {e.target.style.display='none';}} // Ocultar si no carga
+          />
+          <div className="hidden md:block">
+            <h1 className="text-lg font-bold leading-tight text-gray-100">Colegio de Psicólogos</h1>
+            <p className="text-xs text-blue-400 tracking-widest uppercase">Aula Virtual</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-4">
+           {view !== 'home' && (
+            <button onClick={() => setView('home')} className="text-sm hover:text-blue-400 transition-colors mr-2">
+              Inicio
+            </button>
+          )}
+          
+          <a href="https://caeducgt.org/" className="hidden md:flex items-center gap-1 text-xs text-gray-300 hover:text-white border border-gray-600 px-3 py-1 rounded-full hover:bg-gray-800 transition">
+            <ExternalLink size={12} /> Créditos Académicos
+          </a>
+          <a href="https://colegiodepsicologos.org.gt" className="hidden md:flex items-center gap-1 text-xs text-gray-300 hover:text-white border border-gray-600 px-3 py-1 rounded-full hover:bg-gray-800 transition">
+            <ExternalLink size={12} /> Sitio Oficial
+          </a>
+
+          {isAdmin ? (
+            <button 
+              onClick={handleLogout}
+              className="flex items-center gap-2 bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded text-sm font-medium transition"
+            >
+              <LogOut size={16} /> Salir
+            </button>
+          ) : (
+            <button 
+              onClick={() => setView('login')}
+              className="text-gray-400 hover:text-white transition p-2"
+              title="Acceso Administrativo"
+            >
+              <Lock size={18} />
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {/* Main Content Router */}
+      <div className="pt-0">
+        {view === 'home' && (
+          <HomeView 
+            videos={videos} 
+            recentVideos={recentVideos} 
+            categories={categories} 
+            onVideoSelect={(v) => { setSelectedVideo(v); setView('player'); }} 
+          />
+        )}
+        
+        {view === 'player' && selectedVideo && (
+          <PlayerView 
+            video={selectedVideo} 
+            onBack={() => setView('home')} 
+            userProfile={userProfile}
+            setUserProfile={setUserProfile}
+          />
+        )}
+
+        {view === 'login' && (
+          <LoginView onLogin={handleLogin} onBack={() => setView('home')} />
+        )}
+
+        {view === 'admin' && isAdmin && (
+          <AdminDashboard 
+            videos={videos} 
+            setVideos={setVideos} 
+          />
+        )}
+      </div>
+
+      {/* Footer */}
+      <footer className="py-10 px-8 bg-black/80 text-gray-500 text-sm border-t border-gray-800 mt-10">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="text-center md:text-left">
+            <h3 className="text-white font-serif font-bold mb-2">Colegio de Psicólogos de Guatemala</h3>
+            <p>Formación continua y excelencia profesional.</p>
+          </div>
+          <div className="flex flex-col gap-2">
+             <a href="https://caeducgt.org/" className="hover:underline hover:text-blue-400">Regresar a Créditos Académicos</a>
+             <a href="https://colegiodepsicologos.org.gt" className="hover:underline hover:text-blue-400">Regresar al Colegio de Psicólogos</a>
+          </div>
+        </div>
+        <div className="mt-8 text-center text-xs text-gray-700">
+          © {new Date().getFullYear()} Aula Virtual CPG. Todos los derechos reservados.
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+// --- VISTAS ESPECÍFICAS ---
+
+function HomeView({ videos, recentVideos, categories, onVideoSelect }) {
+  // Hero Video (Random or most recent)
+  const heroVideo = recentVideos[0];
+
+  return (
+    <div className="pb-10">
+      {/* Hero Section */}
+      {heroVideo && (
+        <div className="relative h-[70vh] w-full overflow-hidden">
+          <div className="absolute inset-0">
+            <img 
+              src={heroVideo.thumbnail} 
+              alt={heroVideo.title} 
+              className="w-full h-full object-cover opacity-60 scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#141414] via-[#141414]/60 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-transparent to-transparent" />
+          </div>
+          
+          <div className="absolute bottom-0 left-0 p-8 md:p-16 max-w-2xl z-10 flex flex-col gap-4">
+            <span className="text-yellow-500 font-bold tracking-wider text-sm uppercase bg-black/50 w-fit px-2 py-1 rounded border border-yellow-500/30">
+              Destacado
+            </span>
+            <h1 className="text-4xl md:text-6xl font-bold text-white drop-shadow-xl leading-tight">
+              {heroVideo.title}
+            </h1>
+            <p className="text-gray-200 text-lg md:text-xl line-clamp-3 drop-shadow-md">
+              {heroVideo.description}
+            </p>
+            <div className="flex gap-4 mt-4">
+              <button 
+                onClick={() => onVideoSelect(heroVideo)}
+                className="bg-white text-black px-8 py-3 rounded hover:bg-gray-200 font-bold flex items-center gap-2 transition transform hover:scale-105"
+              >
+                <Play fill="black" size={24} /> Ver Ahora
+              </button>
+              <button className="bg-gray-600/70 text-white px-8 py-3 rounded hover:bg-gray-600/90 font-bold flex items-center gap-2 backdrop-blur-sm transition">
+                <Info size={24} /> Más Info
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Recién Añadidos */}
+      <div className="pl-8 md:pl-16 -mt-10 relative z-20">
+        <h2 className="text-xl md:text-2xl font-bold mb-4 text-white">Recién Añadidos</h2>
+        <div className="flex gap-4 overflow-x-auto pb-8 pr-8 scrollbar-hide snap-x">
+          {recentVideos.map(video => (
+            <VideoCard key={video.id} video={video} onClick={() => onVideoSelect(video)} />
+          ))}
+        </div>
+      </div>
+
+      {/* Categorías */}
+      {categories.map(category => (
+        <div key={category} className="pl-8 md:pl-16 mt-8">
+          <h2 className="text-lg md:text-xl font-bold mb-4 text-gray-200 hover:text-blue-400 cursor-pointer transition">
+            {category}
+          </h2>
+          <div className="flex gap-4 overflow-x-auto pb-4 pr-8 scrollbar-hide snap-x">
+            {videos.filter(v => v.category === category).map(video => (
+              <VideoCard key={video.id} video={video} onClick={() => onVideoSelect(video)} isSmall />
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function VideoCard({ video, onClick, isSmall }) {
+  return (
+    <div 
+      onClick={onClick}
+      className={`relative flex-shrink-0 bg-gray-900 rounded-md overflow-hidden cursor-pointer transition-all duration-300 transform hover:scale-110 hover:z-50 hover:shadow-2xl hover:shadow-blue-900/40 group ${isSmall ? 'w-64 h-36' : 'w-80 h-44'}`}
+    >
+      <img src={video.thumbnail} alt={video.title} className="w-full h-full object-cover" />
+      <div className="absolute inset-0 bg-black/40 group-hover:bg-transparent transition-all" />
+      <div className="absolute bottom-0 left-0 w-full p-3 bg-gradient-to-t from-black via-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-all">
+        <h3 className="font-bold text-sm text-white truncate">{video.title}</h3>
+        <p className="text-xs text-gray-300 flex items-center gap-2 mt-1">
+          <span className="text-green-400 font-semibold">{video.duration} hrs</span>
+          <span>•</span>
+          <span>{video.category}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function PlayerView({ video, onBack, userProfile, setUserProfile }) {
+  const [showQuiz, setShowQuiz] = useState(false);
+  const [showCert, setShowCert] = useState(false);
+
+  return (
+    <div className="min-h-screen bg-[#141414] pt-20 px-4 md:px-16 pb-12">
+      <button onClick={onBack} className="flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition">
+        <ChevronLeft /> Regresar
+      </button>
+
+      {showCert ? (
+        <CertificateView video={video} userProfile={userProfile} onBack={() => setShowCert(false)} />
+      ) : showQuiz ? (
+        <QuizModal 
+          video={video} 
+          onCancel={() => setShowQuiz(false)} 
+          onPass={() => setShowCert(true)} 
+          userProfile={userProfile}
+          setUserProfile={setUserProfile}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Video Player */}
+          <div className="lg:col-span-2">
+            <div className="aspect-video w-full bg-black rounded-lg overflow-hidden shadow-2xl shadow-blue-900/20 border border-gray-800">
+              <iframe 
+                width="100%" 
+                height="100%" 
+                src={`https://www.youtube.com/embed/${video.youtubeId}`} 
+                title={video.title} 
+                frameBorder="0" 
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                allowFullScreen
+              ></iframe>
+            </div>
+          </div>
+
+          {/* Details */}
+          <div className="lg:col-span-1 space-y-6">
+            <div>
+              <h1 className="text-3xl font-bold text-white mb-2">{video.title}</h1>
+              <div className="flex flex-wrap gap-3 text-sm text-gray-400 mb-4">
+                <span className="bg-blue-900/40 text-blue-300 px-2 py-1 rounded border border-blue-900">
+                  {video.category}
+                </span>
+                <span className="bg-gray-800 px-2 py-1 rounded border border-gray-700">
+                  {video.duration} Horas Acreditadas
+                </span>
+              </div>
+              <p className="text-gray-300 leading-relaxed text-sm md:text-base">
+                {video.description}
+              </p>
+            </div>
+
+            {video.quizEnabled ? (
+              <div className="bg-gray-800/50 p-6 rounded-lg border border-gray-700">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2 mb-3">
+                  <Award className="text-yellow-500" /> Certificación Disponible
+                </h3>
+                <p className="text-gray-400 text-sm mb-4">
+                  Completa la evaluación con más del 80% de aciertos para obtener tu certificado oficial del Colegio de Psicólogos.
+                </p>
+                <button 
+                  onClick={() => setShowQuiz(true)}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-md transition shadow-lg shadow-blue-900/50 flex justify-center items-center gap-2"
+                >
+                  Hacer Evaluación
+                </button>
+              </div>
+            ) : (
+              <div className="bg-gray-800/30 p-4 rounded-lg border border-gray-800 text-center text-gray-500 text-sm">
+                Esta clase no requiere evaluación para certificación o no está disponible actualmente.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuizModal({ video, onCancel, onPass, userProfile, setUserProfile }) {
+  const [step, setStep] = useState('info'); // info, questions, result
+  const [answers, setAnswers] = useState({});
+  const [score, setScore] = useState(0);
+
+  const handleStart = () => {
+    if (!userProfile.name || !userProfile.collegiateNumber) {
+      alert("Por favor ingrese su nombre y número de colegiado.");
+      return;
+    }
+    setStep('questions');
+  };
+
+  const handleSubmit = () => {
+    let correct = 0;
+    video.questions.forEach((q, idx) => {
+      if (answers[idx] === q.correctAnswer) correct++;
+    });
+    
+    const percentage = (correct / video.questions.length) * 100;
+    setScore(percentage);
+    setStep('result');
+  };
+
+  if (step === 'info') {
+    return (
+      <div className="max-w-2xl mx-auto bg-gray-900 p-8 rounded-lg border border-gray-800 shadow-2xl">
+        <h2 className="text-2xl font-bold mb-6 text-yellow-500 border-b border-gray-800 pb-2">Datos del Colegiado</h2>
+        <div className="space-y-4 mb-8">
+          <div>
+            <label className="block text-gray-400 text-sm mb-1">Nombre Completo (como aparecerá en el certificado)</label>
+            <input 
+              type="text" 
+              value={userProfile.name} 
+              onChange={e => setUserProfile({...userProfile, name: e.target.value})}
+              className="w-full bg-black border border-gray-700 rounded p-3 text-white focus:border-blue-500 outline-none"
+              placeholder="Ej. Lic. Juan Pérez"
+            />
+          </div>
+          <div>
+            <label className="block text-gray-400 text-sm mb-1">Número de Colegiado</label>
+            <input 
+              type="text" 
+              value={userProfile.collegiateNumber} 
+              onChange={e => setUserProfile({...userProfile, collegiateNumber: e.target.value})}
+              className="w-full bg-black border border-gray-700 rounded p-3 text-white focus:border-blue-500 outline-none"
+              placeholder="Ej. 12345"
+            />
+          </div>
+        </div>
+        <div className="flex justify-end gap-4">
+          <button onClick={onCancel} className="text-gray-400 hover:text-white">Cancelar</button>
+          <button onClick={handleStart} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">Comenzar Evaluación</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'result') {
+    const passed = score >= 80;
+    return (
+      <div className="max-w-md mx-auto bg-gray-900 p-8 rounded-lg text-center border border-gray-800">
+        <div className="flex justify-center mb-4">
+          {passed ? <CheckCircle size={64} className="text-green-500" /> : <XCircle size={64} className="text-red-500" />}
+        </div>
+        <h2 className="text-2xl font-bold mb-2">{passed ? "¡Aprobado!" : "No Aprobado"}</h2>
+        <p className="text-4xl font-bold mb-4 text-blue-400">{score}%</p>
+        <p className="text-gray-400 mb-6">
+          {passed ? "Has completado satisfactoriamente la evaluación." : "Necesitas un 80% para aprobar. Intenta de nuevo prestando atención al video."}
+        </p>
+        <div className="flex justify-center gap-4">
+          <button onClick={onCancel} className="text-gray-400 hover:text-white">Cerrar</button>
+          {passed ? (
+            <button onClick={onPass} className="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-2 rounded font-bold flex items-center gap-2">
+              <Award size={18} /> Obtener Certificado
+            </button>
+          ) : (
+            <button onClick={() => setStep('questions')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">
+              Intentar de Nuevo
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto bg-gray-900 p-6 md:p-8 rounded-lg border border-gray-800">
+      <div className="flex justify-between items-center mb-6 border-b border-gray-800 pb-4">
+        <h2 className="text-xl font-bold text-white">Evaluación: {video.title}</h2>
+        <span className="text-sm text-gray-400">10 Preguntas</span>
+      </div>
+      
+      <div className="space-y-8 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+        {video.questions.map((q, idx) => (
+          <div key={idx} className="bg-black/30 p-4 rounded border border-gray-800">
+            <p className="font-medium text-lg mb-3 text-gray-200">{idx + 1}. {q.question}</p>
+            <div className="space-y-2">
+              {q.options.map((opt, optIdx) => (
+                <label key={optIdx} className={`flex items-center gap-3 p-3 rounded cursor-pointer transition ${answers[idx] === optIdx ? 'bg-blue-900/30 border border-blue-500' : 'hover:bg-gray-800 border border-transparent'}`}>
+                  <input 
+                    type="radio" 
+                    name={`q-${idx}`} 
+                    className="w-4 h-4 text-blue-600"
+                    checked={answers[idx] === optIdx}
+                    onChange={() => setAnswers({...answers, [idx]: optIdx})}
+                  />
+                  <span className="text-gray-300">{opt}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-8 flex justify-end gap-4 border-t border-gray-800 pt-4">
+        <button onClick={onCancel} className="text-gray-400 hover:text-white">Cancelar</button>
+        <button 
+          onClick={handleSubmit} 
+          disabled={Object.keys(answers).length < 10}
+          className="bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-2 rounded font-bold transition"
+        >
+          Finalizar Evaluación
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CertificateView({ video, userProfile, onBack }) {
+  const certRef = useRef();
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-6">
+      <div className="flex gap-4 print:hidden">
+        <button onClick={onBack} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Cerrar</button>
+        <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold flex items-center gap-2">
+          <Save size={18} /> Descargar / Imprimir
+        </button>
+      </div>
+
+      {/* CERTIFICADO VISUAL */}
+      <div className="overflow-auto w-full flex justify-center p-4">
+        <div 
+          ref={certRef}
+          className="bg-white text-black w-[1100px] h-[750px] p-2 relative shadow-2xl print:shadow-none print:w-full print:h-full print:absolute print:top-0 print:left-0 print:m-0"
+          style={{ fontFamily: "'Times New Roman', serif" }}
+        >
+          {/* Borde Decorativo */}
+          <div className="w-full h-full border-[10px] border-double border-[#003366] p-10 flex flex-col items-center justify-between text-center relative bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]">
+            
+            {/* Header / Logo */}
+            <div className="w-full flex justify-center items-center mb-4">
+               {/* Logo Actualizado en Certificado */}
+               <div className="absolute top-10 left-14 opacity-100">
+                 <img 
+                   src="Logo-cpg grande.png" 
+                   alt="Logo CPG" 
+                   className="w-32 h-32 object-contain"
+                 />
+               </div>
+               <div className="flex flex-col items-center">
+                 <h1 className="text-4xl font-bold text-[#003366] uppercase tracking-wider mb-2">Colegio de Psicólogos de Guatemala</h1>
+                 <div className="h-1 w-64 bg-[#d4af37] mb-1"></div>
+                 <div className="h-0.5 w-48 bg-[#003366]"></div>
+               </div>
+               <div className="absolute top-12 right-14 opacity-80">
+                 {/* Sello Decorativo */}
+                 <Award size={90} className="text-[#d4af37]" />
+               </div>
+            </div>
+
+            {/* Cuerpo del Certificado */}
+            <div className="flex-1 flex flex-col justify-center items-center gap-6 w-full max-w-4xl z-10">
+              <p className="text-xl italic text-gray-600">Por medio del presente hace constar que:</p>
+              
+              <h2 className="text-5xl font-bold text-[#003366] border-b-2 border-gray-300 pb-2 px-10 min-w-[500px]">
+                {userProfile.name}
+              </h2>
+              
+              <p className="text-lg text-gray-700 font-semibold">
+                Número de Colegiado: <span className="text-black">{userProfile.collegiateNumber}</span>
+              </p>
+
+              <p className="text-xl mt-4">Ha completado y aprobado satisfactoriamente el curso virtual:</p>
+              
+              <h3 className="text-3xl font-bold text-black uppercase tracking-wide">"{video.title}"</h3>
+              
+              <p className="text-lg mt-2 text-gray-600">
+                Acreditando <span className="font-bold text-[#003366]">{video.duration} horas</span> de formación continua.
+              </p>
+            </div>
+
+            {/* Firmas */}
+            <div className="w-full flex justify-around items-end mt-12 mb-8">
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-64 border-b border-black mb-2 relative">
+                   {/* Firma simulada */}
+                   <span className="absolute -top-8 left-10 font-script text-2xl text-blue-900 transform -rotate-6 opacity-70" style={{fontFamily: 'cursive'}}>Junta Directiva</span>
+                </div>
+                <span className="font-bold text-sm uppercase">Junta Directiva</span>
+                <span className="text-xs text-gray-500">Colegio de Psicólogos de Guatemala</span>
+              </div>
+              
+              <div className="flex flex-col items-center gap-2">
+                <div className="w-64 border-b border-black mb-2 relative">
+                  <span className="absolute -top-10 left-12 font-script text-2xl text-blue-900 transform -rotate-3 opacity-70" style={{fontFamily: 'cursive'}}>Comité Académico</span>
+                </div>
+                <span className="font-bold text-sm uppercase">Comisión de Créditos Académicos</span>
+                <span className="text-xs text-gray-500">Evaluación Aprobada: {new Date().toLocaleDateString()}</span>
+              </div>
+            </div>
+
+            {/* Footer Cert */}
+            <div className="absolute bottom-4 text-[10px] text-gray-400 w-full text-center">
+              Certificado Digital generado automáticamente por Aula Virtual CPG | Verificable en sistema interno.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @media print {
+          @page { size: landscape; margin: 0; }
+          body * { visibility: hidden; }
+          #root { visibility: hidden; }
+          .print\\:hidden { display: none !important; }
+          .bg-white { background-color: white !important; -webkit-print-color-adjust: exact; }
+          /* Select the certificate div specifically */
+          div[class*="w-[1100px]"] {
+            visibility: visible;
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            transform: scale(1);
+            z-index: 9999;
+          }
+          div[class*="w-[1100px]"] * {
+            visibility: visible;
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+function LoginView({ onLogin, onBack }) {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onLogin(email, password);
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-black/90 px-4">
+      <div className="w-full max-w-md bg-[#141414] p-8 rounded-lg shadow-2xl border border-gray-800 relative">
+        <button onClick={onBack} className="absolute top-4 right-4 text-gray-500 hover:text-white"><X /></button>
+        <h2 className="text-3xl font-bold mb-8 text-white">Administrador</h2>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-gray-400 text-sm mb-2">Correo Electrónico</label>
+            <input 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full p-3 rounded bg-[#333] text-white border-none focus:ring-2 focus:ring-blue-600 outline-none"
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-gray-400 text-sm mb-2">Contraseña</label>
+            <input 
+              type="password" 
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-3 rounded bg-[#333] text-white border-none focus:ring-2 focus:ring-blue-600 outline-none"
+              required
+            />
+          </div>
+          <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded transition">
+            Ingresar
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AdminDashboard({ videos, setVideos }) {
+  const [editingVideo, setEditingVideo] = useState(null); // null = list mode, {} = create mode
+  
+  // State for form
+  const [formData, setFormData] = useState({
+    title: '', category: '', youtubeId: '', duration: '', description: '', thumbnail: '', quizEnabled: false
+  });
+  const [questions, setQuestions] = useState([]);
+
+  const handleEdit = (video) => {
+    setEditingVideo(video);
+    setFormData(video);
+    setQuestions(video.questions || []);
+  };
+
+  const handleCreate = () => {
+    const empty = {
+      id: Date.now(),
+      title: '', category: '', youtubeId: '', duration: '', description: '', 
+      thumbnail: 'https://via.placeholder.com/640x360', 
+      quizEnabled: false
+    };
+    setEditingVideo(empty);
+    setFormData(empty);
+    setQuestions(Array(10).fill(null).map((_, i) => ({
+      question: `Pregunta ${i + 1}`,
+      options: ["Opción 1", "Opción 2", "Opción 3"],
+      correctAnswer: 0
+    })));
+  };
+
+  const handleSave = () => {
+    const newVideo = { ...formData, questions: questions };
+    
+    if (videos.some(v => v.id === newVideo.id)) {
+      setVideos(videos.map(v => v.id === newVideo.id ? newVideo : v));
+    } else {
+      setVideos([...videos, newVideo]);
+    }
+    setEditingVideo(null);
+  };
+
+  const handleDelete = (id) => {
+    if (confirm("¿Estás seguro de eliminar este video?")) {
+      setVideos(videos.filter(v => v.id !== id));
+    }
+  };
+
+  // Sub-component for Question Form inside Admin
+  const QuestionEditor = ({ q, idx, onChange }) => (
+    <div className="bg-gray-800 p-4 rounded mb-4 border border-gray-700">
+      <div className="mb-2">
+        <label className="text-xs text-blue-300">Pregunta {idx + 1}</label>
+        <input 
+          type="text" 
+          value={q.question} 
+          onChange={e => onChange(idx, 'question', e.target.value)}
+          className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-sm text-white"
+        />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+        {q.options.map((opt, optIdx) => (
+          <div key={optIdx} className="flex flex-col">
+            <input 
+              type="text" 
+              value={opt} 
+              onChange={e => {
+                const newOpts = [...q.options];
+                newOpts[optIdx] = e.target.value;
+                onChange(idx, 'options', newOpts);
+              }}
+              className={`w-full bg-gray-900 border rounded p-2 text-xs text-white ${q.correctAnswer === optIdx ? 'border-green-500 ring-1 ring-green-500' : 'border-gray-600'}`}
+              placeholder={`Opción ${optIdx + 1}`}
+            />
+            <label className="flex items-center gap-1 mt-1 text-xs text-gray-400 cursor-pointer">
+              <input 
+                type="radio" 
+                name={`correct-${idx}`} 
+                checked={q.correctAnswer === optIdx}
+                onChange={() => onChange(idx, 'correctAnswer', optIdx)}
+              /> Correcta
+            </label>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (editingVideo) {
+    return (
+      <div className="min-h-screen bg-[#141414] pt-24 px-4 md:px-16 pb-12 text-white">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold">{formData.id ? 'Editar Video' : 'Nuevo Video'}</h2>
+            <div className="flex gap-2">
+              <button onClick={() => setEditingVideo(null)} className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600">Cancelar</button>
+              <button onClick={handleSave} className="px-4 py-2 bg-green-600 rounded hover:bg-green-700 font-bold">Guardar Cambios</button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400">Título</label>
+                <input type="text" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400">Categoría</label>
+                <input type="text" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-white" placeholder="Ej. Psicología Clínica" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400">YouTube ID</label>
+                <input type="text" value={formData.youtubeId} onChange={e => setFormData({...formData, youtubeId: e.target.value})} className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-white" placeholder="Ej. hJKwF2rXGz4" />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400">Duración (Horas)</label>
+                <input type="number" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400">URL Imagen Portada</label>
+                <input type="text" value={formData.thumbnail} onChange={e => setFormData({...formData, thumbnail: e.target.value})} className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-white" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400">Descripción</label>
+                <textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full bg-gray-900 border border-gray-700 p-2 rounded text-white h-24" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gray-900 p-6 rounded border border-gray-800">
+            <div className="flex items-center gap-3 mb-4">
+              <input 
+                type="checkbox" 
+                id="quizToggle"
+                checked={formData.quizEnabled}
+                onChange={e => setFormData({...formData, quizEnabled: e.target.checked})}
+                className="w-5 h-5 text-blue-600 rounded"
+              />
+              <label htmlFor="quizToggle" className="font-bold text-lg cursor-pointer">Activar Evaluación para Certificado</label>
+            </div>
+
+            {formData.quizEnabled && (
+              <div className="space-y-4">
+                <p className="text-yellow-500 text-sm mb-4">Debes configurar exactamente 10 preguntas. Marca la respuesta correcta en cada una.</p>
+                {questions.map((q, idx) => (
+                  <QuestionEditor 
+                    key={idx} 
+                    q={q} 
+                    idx={idx} 
+                    onChange={(i, field, val) => {
+                      const newQ = [...questions];
+                      if (field === 'options') newQ[i].options = val;
+                      else newQ[i][field] = val;
+                      setQuestions(newQ);
+                    }} 
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-[#141414] pt-24 px-4 md:px-16 text-white">
+      <div className="flex justify-between items-center mb-8 border-b border-gray-800 pb-4">
+        <h1 className="text-3xl font-bold">Panel de Administración</h1>
+        <button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded font-bold flex items-center gap-2">
+          <Plus size={20} /> Nuevo Video
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {videos.map(video => (
+          <div key={video.id} className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 flex flex-col">
+            <div className="h-40 relative">
+              <img src={video.thumbnail} className="w-full h-full object-cover" alt="" />
+              <div className="absolute top-2 right-2 bg-black/70 px-2 py-1 text-xs rounded text-white">ID: {video.id}</div>
+            </div>
+            <div className="p-4 flex-1">
+              <h3 className="font-bold text-lg mb-1">{video.title}</h3>
+              <p className="text-sm text-gray-400 mb-2">{video.category}</p>
+              <div className="flex items-center gap-2 text-xs mb-4">
+                {video.quizEnabled ? <span className="text-green-400 border border-green-400/30 px-2 py-0.5 rounded">Evaluación Activa</span> : <span className="text-gray-500">Sin Evaluación</span>}
+              </div>
+            </div>
+            <div className="p-4 border-t border-gray-800 flex gap-2">
+              <button onClick={() => handleEdit(video)} className="flex-1 bg-blue-900/40 hover:bg-blue-900/60 text-blue-200 py-2 rounded text-sm transition">Editar</button>
+              <button onClick={() => handleDelete(video.id)} className="px-3 bg-red-900/40 hover:bg-red-900/60 text-red-300 rounded transition"><Trash2 size={16} /></button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
