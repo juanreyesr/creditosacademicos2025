@@ -5,8 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Aula Virtual CPG</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
       .scrollbar-hide::-webkit-scrollbar {
@@ -40,7 +40,7 @@
   </head>
   <body class="bg-black">
     <div id="root"></div>
-    <script type="text/babel">
+    <script type="text/babel" data-presets="react">
       const { useState, useEffect, useRef } = React;
 
       const IconSpan = ({ symbol, size = 16, className }) => (
