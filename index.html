@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Play, Info, CheckCircle, XCircle, LogOut, Plus, Trash2, Award, ChevronLeft, Lock, Save, ExternalLink, Menu, X } from 'lucide-react';
+import { Play, Info, CheckCircle, XCircle, LogOut, Plus, Trash2, Award, ChevronLeft, Lock, Save, ExternalLink, Menu, X, Download, Loader2 } from 'lucide-react';
 
 // --- CONFIGURACIÓN Y DATOS INICIALES ---
 
 const ADMIN_CREDENTIALS = {
-  email: "juanr502@yahoo.es",
-  password: "Tatyalejandro5826"
+  email: "gestor.caeduc@colegiodepsicologos.org.gt",
+  password: "CAEDUC2025"
 };
 
 const INITIAL_VIDEOS = [
@@ -13,7 +13,7 @@ const INITIAL_VIDEOS = [
     id: 1,
     title: "Introducción a la Psicología Clínica",
     category: "Psicología Clínica",
-    youtubeId: "hJKwF2rXGz4", // ID de ejemplo
+    youtubeId: "hJKwF2rXGz4",
     duration: "2",
     description: "Un recorrido fundamental por los principios de la práctica clínica moderna y el abordaje del paciente.",
     thumbnail: "https://img.youtube.com/vi/hJKwF2rXGz4/maxresdefault.jpg",
@@ -52,19 +52,39 @@ const INITIAL_VIDEOS = [
   }
 ];
 
+// --- CARGAR LIBRERÍAS EXTERNAS PARA PDF ---
+const loadScript = (src) => {
+  return new Promise((resolve, reject) => {
+    // Verificar si ya está cargado
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+};
+
+const loadPdfLibraries = async () => {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+};
+
+// Cargar librerías al inicio
+loadPdfLibraries();
+
 // --- COMPONENTES PRINCIPALES ---
 
 export default function App() {
-  // Estado Global
-  const [view, setView] = useState('home'); // home, player, admin, login
+  const [view, setView] = useState('home');
   const [videos, setVideos] = useState([]);
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  
-  // Estado de Usuario (para certificados)
   const [userProfile, setUserProfile] = useState({ name: '', collegiateNumber: '' });
 
-  // Cargar datos (simulación de persistencia)
   useEffect(() => {
     const savedVideos = localStorage.getItem('cpg_videos');
     if (savedVideos) {
@@ -74,14 +94,11 @@ export default function App() {
     }
   }, []);
 
-  // Guardar datos cuando cambian
   useEffect(() => {
     if (videos.length > 0) {
       localStorage.setItem('cpg_videos', JSON.stringify(videos));
     }
   }, [videos]);
-
-  // --- NAVEGACIÓN Y VISTAS ---
 
   const handleLogin = (email, password) => {
     if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
@@ -105,12 +122,11 @@ export default function App() {
       {/* Navbar */}
       <nav className="fixed top-0 w-full z-50 bg-gradient-to-b from-black/90 to-transparent px-4 py-4 flex justify-between items-center transition-all duration-300">
         <div className="flex items-center gap-4 cursor-pointer" onClick={() => setView('home')}>
-          {/* Logo Actualizado */}
           <img 
             src="Logo-cpg grande.png" 
             alt="Logo CPG" 
             className="w-12 h-12 object-contain filter drop-shadow-lg"
-            onError={(e) => {e.target.style.display='none';}} // Ocultar si no carga
+            onError={(e) => {e.target.style.display='none';}}
           />
           <div className="hidden md:block">
             <h1 className="text-lg font-bold leading-tight text-gray-100">Colegio de Psicólogos</h1>
@@ -119,7 +135,7 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-4">
-           {view !== 'home' && (
+          {view !== 'home' && (
             <button onClick={() => setView('home')} className="text-sm hover:text-blue-400 transition-colors mr-2">
               Inicio
             </button>
@@ -191,8 +207,8 @@ export default function App() {
             <p>Formación continua y excelencia profesional.</p>
           </div>
           <div className="flex flex-col gap-2">
-             <a href="https://caeducgt.org/" className="hover:underline hover:text-blue-400">Regresar a Créditos Académicos</a>
-             <a href="https://colegiodepsicologos.org.gt" className="hover:underline hover:text-blue-400">Regresar al Colegio de Psicólogos</a>
+            <a href="https://caeducgt.org/" className="hover:underline hover:text-blue-400">Regresar a Créditos Académicos</a>
+            <a href="https://colegiodepsicologos.org.gt" className="hover:underline hover:text-blue-400">Regresar al Colegio de Psicólogos</a>
           </div>
         </div>
         <div className="mt-8 text-center text-xs text-gray-700">
@@ -206,7 +222,6 @@ export default function App() {
 // --- VISTAS ESPECÍFICAS ---
 
 function HomeView({ videos, recentVideos, categories, onVideoSelect }) {
-  // Hero Video (Random or most recent)
   const heroVideo = recentVideos[0];
 
   return (
@@ -378,7 +393,7 @@ function PlayerView({ video, onBack, userProfile, setUserProfile }) {
 }
 
 function QuizModal({ video, onCancel, onPass, userProfile, setUserProfile }) {
-  const [step, setStep] = useState('info'); // info, questions, result
+  const [step, setStep] = useState('info');
   const [answers, setAnswers] = useState({});
   const [score, setScore] = useState(0);
 
@@ -454,7 +469,7 @@ function QuizModal({ video, onCancel, onPass, userProfile, setUserProfile }) {
               <Award size={18} /> Obtener Certificado
             </button>
           ) : (
-            <button onClick={() => setStep('questions')} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">
+            <button onClick={() => { setStep('questions'); setAnswers({}); }} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold">
               Intentar de Nuevo
             </button>
           )}
@@ -506,126 +521,264 @@ function QuizModal({ video, onCancel, onPass, userProfile, setUserProfile }) {
   );
 }
 
+// ===============================
+// CERTIFICADO CON GENERACIÓN REAL DE PDF (usando CDN)
+// ===============================
 function CertificateView({ video, userProfile, onBack }) {
-  const certRef = useRef();
+  const certRef = useRef(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [error, setError] = useState(null);
+  const [librariesLoaded, setLibrariesLoaded] = useState(false);
 
-  const handlePrint = () => {
-    window.print();
+  // Verificar que las librerías estén cargadas
+  useEffect(() => {
+    const checkLibraries = () => {
+      if (window.html2canvas && window.jspdf) {
+        setLibrariesLoaded(true);
+      } else {
+        // Reintentar en 500ms
+        setTimeout(checkLibraries, 500);
+      }
+    };
+    checkLibraries();
+  }, []);
+
+  const generatePDF = async () => {
+    if (!certRef.current) {
+      setError("Error: No se pudo encontrar el certificado.");
+      return;
+    }
+
+    if (!window.html2canvas || !window.jspdf) {
+      setError("Error: Las librerías de PDF aún no están listas. Espera un momento e intenta de nuevo.");
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      // Capturar el certificado como imagen usando html2canvas
+      const canvas = await window.html2canvas(certRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+
+      // Crear el PDF con jsPDF
+      const { jsPDF } = window.jspdf;
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'letter'
+      });
+
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+      const fileName = `Certificado_${userProfile.name.replace(/\s+/g, '_')}_${video.title.replace(/\s+/g, '_').substring(0, 30)}.pdf`;
+      
+      pdf.save(fileName);
+
+    } catch (err) {
+      console.error("Error al generar PDF:", err);
+      setError("Hubo un error al generar el PDF. Por favor intenta de nuevo.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
+
+  const currentDate = new Date().toLocaleDateString('es-GT', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric'
+  });
 
   return (
     <div className="flex flex-col items-center gap-6">
-      <div className="flex gap-4 print:hidden">
-        <button onClick={onBack} className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded">Cerrar</button>
-        <button onClick={handlePrint} className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded font-bold flex items-center gap-2">
-          <Save size={18} /> Descargar / Imprimir
+      {/* Botones de acción */}
+      <div className="flex gap-4 flex-wrap justify-center">
+        <button 
+          onClick={onBack} 
+          className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded transition"
+        >
+          Cerrar
+        </button>
+        <button 
+          onClick={generatePDF}
+          disabled={isGenerating || !librariesLoaded}
+          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 disabled:cursor-wait text-white px-6 py-2 rounded font-bold flex items-center gap-2 transition"
+        >
+          {isGenerating ? (
+            <>
+              <Loader2 size={18} className="animate-spin" /> Generando PDF...
+            </>
+          ) : !librariesLoaded ? (
+            <>
+              <Loader2 size={18} className="animate-spin" /> Cargando...
+            </>
+          ) : (
+            <>
+              <Download size={18} /> Descargar PDF
+            </>
+          )}
         </button>
       </div>
 
-      {/* CERTIFICADO VISUAL */}
+      {/* Mensaje de error */}
+      {error && (
+        <div className="bg-red-900/50 border border-red-500 text-red-200 px-4 py-2 rounded">
+          {error}
+        </div>
+      )}
+
+      {/* Vista previa del certificado */}
       <div className="overflow-auto w-full flex justify-center p-4">
         <div 
           ref={certRef}
-          className="bg-white text-black w-[1100px] h-[750px] p-2 relative shadow-2xl print:shadow-none print:w-full print:h-full print:absolute print:top-0 print:left-0 print:m-0"
-          style={{ fontFamily: "'Times New Roman', serif" }}
+          style={{
+            width: '1100px',
+            height: '750px',
+            padding: '8px',
+            position: 'relative',
+            backgroundColor: '#ffffff',
+            color: '#000000',
+            fontFamily: "'Times New Roman', Georgia, serif",
+            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)'
+          }}
         >
           {/* Borde Decorativo */}
-          <div className="w-full h-full border-[10px] border-double border-[#003366] p-10 flex flex-col items-center justify-between text-center relative bg-[url('https://www.transparenttextures.com/patterns/cream-paper.png')]">
+          <div 
+            style={{
+              width: '100%',
+              height: '100%',
+              padding: '40px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              textAlign: 'center',
+              position: 'relative',
+              border: '10px double #003366',
+              backgroundColor: '#fffef9',
+              boxSizing: 'border-box'
+            }}
+          >
             
             {/* Header / Logo */}
-            <div className="w-full flex justify-center items-center mb-4">
-               {/* Logo Actualizado en Certificado */}
-               <div className="absolute top-10 left-14 opacity-100">
-                 <img 
-                   src="Logo-cpg grande.png" 
-                   alt="Logo CPG" 
-                   className="w-32 h-32 object-contain"
-                 />
-               </div>
-               <div className="flex flex-col items-center">
-                 <h1 className="text-4xl font-bold text-[#003366] uppercase tracking-wider mb-2">Colegio de Psicólogos de Guatemala</h1>
-                 <div className="h-1 w-64 bg-[#d4af37] mb-1"></div>
-                 <div className="h-0.5 w-48 bg-[#003366]"></div>
-               </div>
-               <div className="absolute top-12 right-14 opacity-80">
-                 {/* Sello Decorativo */}
-                 <Award size={90} className="text-[#d4af37]" />
-               </div>
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '16px', position: 'relative' }}>
+              {/* Logo izquierdo */}
+              <div style={{ position: 'absolute', top: '0', left: '16px' }}>
+                <div 
+                  style={{ 
+                    width: '96px',
+                    height: '96px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '3px solid #003366',
+                    backgroundColor: '#f8f8f8'
+                  }}
+                >
+                  <span style={{ color: '#003366', fontSize: '10px', textAlign: 'center', padding: '5px' }}>
+                    COLEGIO DE<br/>PSICÓLOGOS<br/>DE GUATEMALA
+                  </span>
+                </div>
+              </div>
+              
+              {/* Título central */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                <h1 style={{ fontSize: '32px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: '8px', color: '#003366' }}>
+                  Colegio de Psicólogos de Guatemala
+                </h1>
+                <div style={{ height: '4px', width: '256px', backgroundColor: '#d4af37', marginBottom: '4px' }}></div>
+                <div style={{ height: '2px', width: '192px', backgroundColor: '#003366' }}></div>
+              </div>
+              
+              {/* Sello Decorativo derecho */}
+              <div style={{ position: 'absolute', top: '0', right: '16px' }}>
+                <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="#d4af37" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="8" r="6"></circle>
+                  <path d="M15.477 12.89 17 22l-5-3-5 3 1.523-9.11"></path>
+                </svg>
+              </div>
+            </div>
+
+            {/* Texto "CERTIFICADO" */}
+            <div style={{ marginTop: '16px' }}>
+              <h2 style={{ fontSize: '24px', fontWeight: 'bold', letterSpacing: '0.3em', textTransform: 'uppercase', color: '#003366' }}>
+                Certificado
+              </h2>
             </div>
 
             {/* Cuerpo del Certificado */}
-            <div className="flex-1 flex flex-col justify-center items-center gap-6 w-full max-w-4xl z-10">
-              <p className="text-xl italic text-gray-600">Por medio del presente hace constar que:</p>
+            <div style={{ flex: '1', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', gap: '24px', width: '100%', maxWidth: '800px' }}>
+              <p style={{ fontSize: '20px', fontStyle: 'italic', color: '#555' }}>
+                Por medio del presente hace constar que:
+              </p>
               
-              <h2 className="text-5xl font-bold text-[#003366] border-b-2 border-gray-300 pb-2 px-10 min-w-[500px]">
+              <h2 style={{ fontSize: '42px', fontWeight: 'bold', paddingBottom: '8px', paddingLeft: '40px', paddingRight: '40px', color: '#003366', borderBottom: '2px solid #ccc', minWidth: '500px' }}>
                 {userProfile.name}
               </h2>
               
-              <p className="text-lg text-gray-700 font-semibold">
-                Número de Colegiado: <span className="text-black">{userProfile.collegiateNumber}</span>
+              <p style={{ fontSize: '18px', fontWeight: '600', color: '#444' }}>
+                Número de Colegiado: <span style={{ color: '#000' }}>{userProfile.collegiateNumber}</span>
               </p>
 
-              <p className="text-xl mt-4">Ha completado y aprobado satisfactoriamente el curso virtual:</p>
+              <p style={{ fontSize: '20px', marginTop: '16px' }}>
+                Ha completado y aprobado satisfactoriamente el curso virtual:
+              </p>
               
-              <h3 className="text-3xl font-bold text-black uppercase tracking-wide">"{video.title}"</h3>
+              <h3 style={{ fontSize: '26px', fontWeight: 'bold', textTransform: 'uppercase', letterSpacing: '0.05em', color: '#000' }}>
+                "{video.title}"
+              </h3>
               
-              <p className="text-lg mt-2 text-gray-600">
-                Acreditando <span className="font-bold text-[#003366]">{video.duration} horas</span> de formación continua.
+              <p style={{ fontSize: '18px', marginTop: '8px', color: '#555' }}>
+                Acreditando <span style={{ fontWeight: 'bold', color: '#003366' }}>{video.duration} horas</span> de formación continua.
               </p>
             </div>
 
             {/* Firmas */}
-            <div className="w-full flex justify-around items-end mt-12 mb-8">
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-64 border-b border-black mb-2 relative">
-                   {/* Firma simulada */}
-                   <span className="absolute -top-8 left-10 font-script text-2xl text-blue-900 transform -rotate-6 opacity-70" style={{fontFamily: 'cursive'}}>Junta Directiva</span>
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', marginTop: '48px', marginBottom: '32px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '256px', borderBottom: '1px solid #000', marginBottom: '8px', position: 'relative', height: '40px' }}>
+                  <span style={{ position: 'absolute', fontFamily: 'cursive', fontSize: '20px', color: '#1a365d', opacity: '0.7', top: '-5px', left: '40px', transform: 'rotate(-6deg)' }}>
+                    Junta Directiva
+                  </span>
                 </div>
-                <span className="font-bold text-sm uppercase">Junta Directiva</span>
-                <span className="text-xs text-gray-500">Colegio de Psicólogos de Guatemala</span>
+                <span style={{ fontWeight: 'bold', fontSize: '12px', textTransform: 'uppercase' }}>Junta Directiva</span>
+                <span style={{ fontSize: '11px', color: '#666' }}>Colegio de Psicólogos de Guatemala</span>
               </div>
               
-              <div className="flex flex-col items-center gap-2">
-                <div className="w-64 border-b border-black mb-2 relative">
-                  <span className="absolute -top-10 left-12 font-script text-2xl text-blue-900 transform -rotate-3 opacity-70" style={{fontFamily: 'cursive'}}>Comité Académico</span>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '256px', borderBottom: '1px solid #000', marginBottom: '8px', position: 'relative', height: '40px' }}>
+                  <span style={{ position: 'absolute', fontFamily: 'cursive', fontSize: '20px', color: '#1a365d', opacity: '0.7', top: '-10px', left: '30px', transform: 'rotate(-3deg)' }}>
+                    Comité Académico
+                  </span>
                 </div>
-                <span className="font-bold text-sm uppercase">Comisión de Créditos Académicos</span>
-                <span className="text-xs text-gray-500">Evaluación Aprobada: {new Date().toLocaleDateString()}</span>
+                <span style={{ fontWeight: 'bold', fontSize: '12px', textTransform: 'uppercase' }}>Comisión de Créditos Académicos</span>
+                <span style={{ fontSize: '11px', color: '#666' }}>Evaluación Aprobada: {currentDate}</span>
               </div>
             </div>
 
             {/* Footer Cert */}
-            <div className="absolute bottom-4 text-[10px] text-gray-400 w-full text-center">
+            <div style={{ position: 'absolute', bottom: '16px', textAlign: 'center', width: '100%', fontSize: '10px', color: '#999' }}>
               Certificado Digital generado automáticamente por Aula Virtual CPG | Verificable en sistema interno.
             </div>
           </div>
         </div>
       </div>
 
-      <style>{`
-        @media print {
-          @page { size: landscape; margin: 0; }
-          body * { visibility: hidden; }
-          #root { visibility: hidden; }
-          .print\\:hidden { display: none !important; }
-          .bg-white { background-color: white !important; -webkit-print-color-adjust: exact; }
-          /* Select the certificate div specifically */
-          div[class*="w-[1100px]"] {
-            visibility: visible;
-            position: fixed;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            transform: scale(1);
-            z-index: 9999;
-          }
-          div[class*="w-[1100px]"] * {
-            visibility: visible;
-          }
-        }
-      `}</style>
+      {/* Instrucciones */}
+      <div className="text-center text-gray-400 text-sm max-w-md">
+        <p>Haz clic en "Descargar PDF" para guardar tu certificado. El archivo se descargará automáticamente a tu dispositivo.</p>
+      </div>
     </div>
   );
 }
@@ -675,9 +828,7 @@ function LoginView({ onLogin, onBack }) {
 }
 
 function AdminDashboard({ videos, setVideos }) {
-  const [editingVideo, setEditingVideo] = useState(null); // null = list mode, {} = create mode
-  
-  // State for form
+  const [editingVideo, setEditingVideo] = useState(null);
   const [formData, setFormData] = useState({
     title: '', category: '', youtubeId: '', duration: '', description: '', thumbnail: '', quizEnabled: false
   });
@@ -722,7 +873,6 @@ function AdminDashboard({ videos, setVideos }) {
     }
   };
 
-  // Sub-component for Question Form inside Admin
   const QuestionEditor = ({ q, idx, onChange }) => (
     <div className="bg-gray-800 p-4 rounded mb-4 border border-gray-700">
       <div className="mb-2">
