@@ -1,0 +1,197 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "UPANA Lead Manager",
+      "persona": "E1: The Anti-AI Designer",
+      "vibe": "Institutional Trust meets Student Aspiration",
+      "principles": [
+        "Fusion: Academic Rigor + Digital Ease",
+        "Emotion: Confidence in Future",
+        "Clarity: High-density data for Admin, Storytelling for Students"
+      ]
+    },
+    "theme_strategy": {
+      "mode": "light",
+      "reasoning": "Education and trust require clarity. Light mode is standard for university portals. Admin dashboard uses high-contrast light mode for data readability."
+    },
+    "colors": {
+      "palette": {
+        "primary": {
+          "name": "UPANA Blue",
+          "hex": "#003DA5",
+          "tailwind_var": "--primary",
+          "usage": "Headers, Primary Buttons, Active States, Links"
+        },
+        "secondary": {
+          "name": "UPANA Magenta",
+          "hex": "#E91E8C",
+          "tailwind_var": "--secondary",
+          "usage": "Call to Actions (Register), Highlights, Badges"
+        },
+        "background": {
+          "name": "Academic Slate",
+          "hex": "#F8FAFC",
+          "tailwind_var": "--background",
+          "usage": "Page Backgrounds (avoids sterile white)"
+        },
+        "surface": {
+          "name": "Pure White",
+          "hex": "#FFFFFF",
+          "tailwind_var": "--card",
+          "usage": "Cards, Modals, Sidebar"
+        },
+        "text": {
+          "primary": "#0F172A",
+          "secondary": "#475569",
+          "muted": "#94A3B8"
+        }
+      },
+      "css_variables": {
+        "root": {
+          "--background": "210 40% 98%",
+          "--foreground": "222 47% 11%",
+          "--card": "0 0% 100%",
+          "--card-foreground": "222 47% 11%",
+          "--popover": "0 0% 100%",
+          "--popover-foreground": "222 47% 11%",
+          "--primary": "218 100% 32%",
+          "--primary-foreground": "210 40% 98%",
+          "--secondary": "328 83% 52%",
+          "--secondary-foreground": "210 40% 98%",
+          "--muted": "210 40% 96.1%",
+          "--muted-foreground": "215.4 16.3% 46.9%",
+          "--accent": "210 40% 96.1%",
+          "--accent-foreground": "222.2 47.4% 11.2%",
+          "--destructive": "0 84.2% 60.2%",
+          "--destructive-foreground": "210 40% 98%",
+          "--border": "214.3 31.8% 91.4%",
+          "--input": "214.3 31.8% 91.4%",
+          "--ring": "218 100% 32%",
+          "--radius": "0.75rem"
+        }
+      }
+    },
+    "typography": {
+      "fonts": {
+        "headings": {
+          "family": "Outfit, sans-serif",
+          "weights": ["500", "700"],
+          "source": "Google Fonts",
+          "usage": "H1, H2, H3, Hero Text"
+        },
+        "body": {
+          "family": "Inter, sans-serif",
+          "weights": ["400", "500", "600"],
+          "source": "Google Fonts",
+          "usage": "Paragraphs, UI Elements, Data Tables"
+        }
+      },
+      "scale": {
+        "h1": "text-4xl md:text-6xl font-bold tracking-tight",
+        "h2": "text-3xl md:text-4xl font-bold tracking-tight",
+        "h3": "text-xl md:text-2xl font-semibold",
+        "body": "text-base leading-relaxed text-slate-600",
+        "small": "text-sm font-medium text-slate-500"
+      }
+    },
+    "layout": {
+      "spacing": {
+        "container_padding": "px-4 md:px-8 lg:px-12",
+        "section_gap": "py-16 md:py-24",
+        "element_gap": "gap-6"
+      },
+      "grids": {
+        "public_benefits": {
+          "type": "Bento Grid",
+          "classes": "grid grid-cols-1 md:grid-cols-3 gap-6",
+          "description": "Use for 'Why UPANA'. Mix of col-span-1 and col-span-2 cards."
+        },
+        "admin_dashboard": {
+          "type": "High Density",
+          "classes": "grid grid-cols-1 md:grid-cols-4 gap-4",
+          "description": "Metrics on top (col-span-1), Main Table below (col-span-full)."
+        }
+      }
+    },
+    "components": {
+      "buttons": {
+        "primary": "bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 rounded-full shadow-lg hover:shadow-xl transition-all duration-300",
+        "secondary": "bg-secondary text-secondary-foreground hover:bg-secondary/90 h-11 px-8 rounded-full shadow-md hover:shadow-lg transition-all duration-300",
+        "outline": "border-2 border-primary text-primary hover:bg-primary/10 h-11 px-8 rounded-full"
+      },
+      "cards": {
+        "feature": "bg-white border border-slate-100 rounded-2xl p-8 shadow-sm hover:shadow-md transition-all duration-300 hover:-translate-y-1",
+        "pricing": "relative overflow-hidden bg-white border-2 border-slate-100 rounded-3xl p-8 shadow-xl hover:border-primary/20 transition-colors",
+        "admin_metric": "bg-white border border-slate-200 rounded-xl p-6 shadow-sm"
+      },
+      "inputs": {
+        "default": "h-11 rounded-lg border-slate-200 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+      }
+    },
+    "visual_enhancers": {
+      "gradients": {
+        "hero_overlay": "bg-gradient-to-r from-primary/90 to-primary/70",
+        "subtle_glow": "bg-gradient-to-tr from-secondary/10 to-primary/5"
+      },
+      "textures": {
+        "noise": "Use a subtle SVG noise overlay on the Hero section to reduce digital flatness."
+      },
+      "motion": {
+        "hover": "transition-all duration-300 ease-out",
+        "entrance": "animate-in fade-in slide-in-from-bottom-4 duration-700"
+      }
+    },
+    "assets": {
+      "images": [
+        {
+          "category": "hero_bg",
+          "url": "https://images.pexels.com/photos/159775/library-la-trobe-study-students-159775.jpeg",
+          "description": "Students in library - Use with heavy blue overlay for Hero background"
+        },
+        {
+          "category": "campus_building",
+          "url": "https://images.pexels.com/photos/20528398/pexels-photo-20528398.jpeg",
+          "description": "Modern building - Use for 'Edificio Propio' section"
+        },
+        {
+          "category": "career_psychology",
+          "url": "https://images.pexels.com/photos/5234624/pexels-photo-5234624.jpeg",
+          "description": "Therapy session - Use for Psychology Career card"
+        },
+        {
+          "category": "career_science",
+          "url": "https://images.pexels.com/photos/7092334/pexels-photo-7092334.jpeg",
+          "description": "Students studying - Use for Science Career card"
+        }
+      ],
+      "icons": "Use 'lucide-react' for all UI icons. Use 'Brain', 'BookOpen', 'Building2', 'Users' for key sections."
+    },
+    "instructions_to_main_agent": {
+      "setup": [
+        "Update /app/frontend/src/index.css with the provided CSS variables.",
+        "Install 'lucide-react' and 'framer-motion' if not present.",
+        "Ensure all components use the 'data-testid' attribute."
+      ],
+      "implementation_rules": [
+        "Do NOT use TypeScript (.tsx). Use .js/.jsx files.",
+        "For the Public Landing Page: Use the 'Tetris Grid' layout. Do not make it a boring list.",
+        "For the Admin Dashboard: Prioritize data density. Use tables with clear headers.",
+        "AI Chatbot: Make it a floating widget (bottom-right) with the UPANA logo or a friendly avatar.",
+        "Forms: Use 'react-hook-form' with Shadcn components for validation.",
+        "Charts: Use 'recharts' for the Admin Dashboard metrics."
+      ]
+    },
+    "universal_guidelines": {
+      "do_not": [
+        "Do not use generic 'Lorem Ipsum'. Use real text related to Psychology/University.",
+        "Do not use pure black (#000000). Use Slate-900 (#0F172A).",
+        "Do not center-align long paragraphs."
+      ],
+      "must_do": [
+        "Add 'aria-label' to all interactive elements.",
+        "Ensure contrast ratios meet WCAG AA (4.5:1).",
+        "Use 'sonner' for toast notifications."
+      ]
+    }
+  }
+}
